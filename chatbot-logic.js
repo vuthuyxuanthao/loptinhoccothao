@@ -15,7 +15,7 @@ const FAQ = [
   },
   {
     keys: ["người lạ", "nguoi la", "kết bạn"],
-    answer: "🤖 NAO: Trên mạng có thể có người lạ giả làm bạn. Bạn không nhận lời kết bạn, không nói chuyện riêng và không hẹn gặp người lạ. Hãy kể với người lớn mà bạn tin tưởng nhé!",
+    answer: "🤖 NAO: Trên mạng có thể có người lạ giả làm bạn. Bạn không nhận lời kết bạn, không nhận đồ, không nói chuyện riêng và không hẹn gặp người lạ. Hãy kể với người lớn mà bạn tin tưởng nhé!",
   },
   {
     keys: ["bắt nạt", "bat nat", "chửi", "trêu"],
@@ -25,6 +25,7 @@ const FAQ = [
     keys: ["xin chào", "xin chao", "chào nao", "hello", "hi nao"],
     answer: "🤖 NAO: Chào bạn! Tớ là NAO. Bạn muốn hỏi tớ về mật khẩu, thông tin cá nhân hay cách dùng Internet an toàn nào?",
   },
+ 
 ];
 
 function findFaqAnswer(text) {
