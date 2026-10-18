@@ -52,6 +52,7 @@ export default async (req) => {
   // Không chờ lâu ở máy chủ (Netlify cắt hàm sau ~10 giây).
   // Nếu bận, trả lỗi "busy" để trình duyệt tự chờ rồi hỏi lại.
   let lastStatus = 0;
+  let lastDetail = "";
   for (const model of MODELS) {
     try {
       const { status, data } = await callGemini(model, message, apiKey);
@@ -65,17 +66,24 @@ export default async (req) => {
         });
       }
       lastStatus = status;
-      if (status === 400 || status === 403) break; // sai khóa: không thử tiếp
-    } catch {
+      lastDetail = data?.error?.message || "";
+      // Ghi lỗi vào nhật ký Netlify (Logs > Functions > chat) để dễ tìm nguyên nhân
+      console.error(`Gemini ${model} lỗi ${status}: ${lastDetail}`);
+      if (status === 400 || status === 401 || status === 403) break; // sai khóa: không thử tiếp
+    } catch (e) {
       lastStatus = 0;
+      lastDetail = String(e);
+      console.error("Không gọi được Gemini:", e);
     }
   }
 
-  if (lastStatus === 400 || lastStatus === 403) {
-    return Response.json({ error: "bad_key" }, { status: 500 });
+  const detail = `${lastStatus} ${lastDetail}`.trim();
+  if (lastStatus === 429 || lastStatus === 500 || lastStatus === 503) {
+    // Hết lượt/phút hoặc Gemini quá tải: trình duyệt sẽ xếp hàng rồi hỏi lại
+    return Response.json({ error: "busy", detail }, { status: 503 });
   }
-  // 429 (hết lượt/phút) hoặc 500/503 (Gemini quá tải) đều coi là "bận"
-  return Response.json({ error: "busy" }, { status: 503 });
+  // Các lỗi khác (sai khóa, sai model...): không hỏi lại, báo bảo trì
+  return Response.json({ error: "bad_key", detail }, { status: 500 });
 };
 
 export const config = { path: "/api/chat" };
