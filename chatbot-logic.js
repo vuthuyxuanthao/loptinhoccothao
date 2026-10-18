@@ -108,7 +108,14 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       if (res && res.ok && data.reply) return data.reply;
-      if (data.error === "bad_key" || data.error === "missing_key") return MESSAGES.maintenance;
+      if (data.detail) console.warn("Chi tiết lỗi:", data.detail);
+      if (res && res.status === 404) {
+        console.warn("Không tìm thấy /api/chat — kiểm tra thư mục netlify/functions");
+        return MESSAGES.maintenance;
+      }
+      if (data.error === "bad_key" || data.error === "missing_key") {
+        return MESSAGES.maintenance + (data.detail ? " (Mã lỗi: " + data.detail.slice(0, 80) + ")" : "");
+      }
 
       // Bận: chờ rồi thử lại (thêm chút ngẫu nhiên để các máy không hỏi lại cùng lúc)
       if (attempt < RETRY_DELAYS.length) {
