@@ -1,90 +1,161 @@
-// Thay vì dùng google.genai, chúng ta IMPORT GoogleGenAI
-import { GoogleGenAI } from './genai.js'; // Đường dẫn đến tệp genai.js
+// chatbot-logic.js — phía trình duyệt. KHÔNG chứa Khóa API.
+// Câu hỏi được gửi tới /api/chat (hàm Netlify), hàm đó mới gọi Gemini.
 
-// **********************************************
-// ⚠️ QUAN TRỌNG: Thay Khóa API của bạn vào đây!
-// **********************************************
-const GEMINI_API_KEY = "AIzaSyD97_1KT7bYgrjaDIV-UhwdUT_NCVr64tA"; 
+// ===== 1. CÂU TRẢ LỜI CÓ SẴN (không tốn lượt gọi Gemini) =====
+// Câu hỏi nào chứa một trong các từ khóa sẽ được trả lời ngay.
+// Thầy cô có thể thêm/sửa các mục bên dưới cho hợp bài học.
+const FAQ = [
+  {
+    keys: ["mật khẩu", "mat khau", "password"],
+    answer: "🤖 NAO: Mật khẩu giống như chìa khóa nhà vậy! Bạn chỉ cho bố mẹ biết thôi, không đưa cho bạn bè hay người lạ. Mật khẩu tốt nên dài, có cả chữ và số nhé!",
+  },
+  {
+    keys: ["thông tin cá nhân", "thong tin ca nhan", "địa chỉ nhà", "số điện thoại"],
+    answer: "🤖 NAO: Tên trường, địa chỉ nhà, số điện thoại là thông tin cá nhân. Bạn đừng chia sẻ lên mạng hay gửi cho người lạ. Nếu có ai hỏi, hãy báo ngay cho bố mẹ hoặc thầy cô nha!",
+  },
+  {
+    keys: ["người lạ", "nguoi la", "kết bạn"],
+    answer: "🤖 NAO: Trên mạng có thể có người lạ giả làm bạn. Bạn không nhận lời kết bạn, không nói chuyện riêng và không hẹn gặp người lạ. Hãy kể với người lớn mà bạn tin tưởng nhé!",
+  },
+  {
+    keys: ["bắt nạt", "bat nat", "chửi", "trêu"],
+    answer: "🤖 NAO: Nếu ai đó nói lời xấu với bạn trên mạng, bạn đừng trả lời lại. Hãy chụp màn hình và báo cho bố mẹ, thầy cô ngay. Bạn không có lỗi đâu, và luôn có người giúp bạn!",
+  },
+  {
+    keys: ["xin chào", "xin chao", "chào nao", "hello", "hi nao"],
+    answer: "🤖 NAO: Chào bạn! Tớ là NAO. Bạn muốn hỏi tớ về mật khẩu, thông tin cá nhân hay cách dùng Internet an toàn nào?",
+  },
+];
 
-// 1. Khởi tạo Gemini Client
-// Lưu ý: Vì ta dùng import, GenAI Client đã được định nghĩa trong genai.js
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-const modelName = 'gemini-2.5-flash';
+function findFaqAnswer(text) {
+  const t = text.toLowerCase();
+  const hit = FAQ.find((item) => item.keys.some((k) => t.includes(k)));
+  return hit ? hit.answer : null;
+}
 
-// Lời nhắc hệ thống để định hướng vai trò
-const systemInstruction = `Bạn là Robot NAO, một trợ lý thân thiện, kiên nhẫn và luôn cười, chuyên về Kỹ năng Công dân số cho học sinh tiểu học (từ 6 đến 11 tuổi). 
-Hãy trả lời ngắn gọn, đơn giản, dễ hiểu và tích cực, luôn bắt đầu bằng "🤖 NAO:". 
-Nếu câu hỏi không liên quan đến Công dân số, an toàn mạng, hay robot, hãy lịch sự từ chối bằng cách nói rằng bạn chỉ biết về Công dân số.`;
+// ===== 2. CÀI ĐẶT CHỜ & THỬ LẠI =====
+const RETRY_DELAYS = [4000, 8000, 15000]; // nếu bận: chờ 4s, 8s, 15s rồi hỏi lại
+const COOLDOWN_MS = 8000; // mỗi bạn phải chờ 8 giây giữa 2 câu hỏi
 
+const MESSAGES = {
+  waiting: (s) => `🤖 NAO: Nhiều bạn đang hỏi cùng lúc, tớ xếp hàng một chút nhé... (${s} giây)`,
+  busy: "🤖 NAO: Hiện có rất nhiều bạn đang hỏi. Bạn chờ khoảng 1 phút rồi hỏi lại tớ nhé!",
+  maintenance: "🤖 NAO: Tớ đang được thầy cô bảo trì. Bạn quay lại sau nhé!",
+  offline: "🤖 NAO: Hình như máy bạn đang mất mạng. Bạn kiểm tra Internet rồi hỏi lại nhé!",
+};
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Lấy các phần tử HTML
-    const container = document.getElementById('naoChatbotContainer');
-    const toggleButton = document.getElementById('naoChatbotToggle');
-    const contentArea = document.getElementById('chatbotContent');
-    const userInput = document.getElementById('userInput');
-    const sendButton = document.getElementById('sendButton');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-    // *************** A. LOGIC ĐÓNG/MỞ KHUNG ***************
-    function toggleChatbot() {
-        container.classList.toggle('open');
-        if (container.classList.contains('open')) {
-            contentArea.scrollTop = contentArea.scrollHeight;
-            userInput.focus();
-        }
+document.addEventListener("DOMContentLoaded", function () {
+  const container = document.getElementById("naoChatbotContainer");
+  const toggleButton = document.getElementById("naoChatbotToggle");
+  const contentArea = document.getElementById("chatbotContent");
+  const userInput = document.getElementById("userInput");
+  const sendButton = document.getElementById("sendButton");
+
+  // A. Đóng/mở khung
+  toggleButton.addEventListener("click", function () {
+    container.classList.toggle("open");
+    if (container.classList.contains("open")) {
+      contentArea.scrollTop = contentArea.scrollHeight;
+      userInput.focus();
     }
-    toggleButton.addEventListener('click', toggleChatbot);
+  });
 
-    // *************** B. LOGIC GỌI GEMINI ***************
-    
-    // Hàm tạo và hiển thị tin nhắn
-    function displayMessage(text, sender) {
-        const messageElement = document.createElement('p');
-        messageElement.classList.add(sender === 'user' ? 'user-message' : 'bot-message');
-        messageElement.textContent = text;
-        contentArea.appendChild(messageElement);
-        contentArea.scrollTop = contentArea.scrollHeight;
-        return messageElement;
+  function displayMessage(text, sender) {
+    const el = document.createElement("p");
+    el.classList.add(sender === "user" ? "user-message" : "bot-message");
+    el.textContent = text;
+    contentArea.appendChild(el);
+    contentArea.scrollTop = contentArea.scrollHeight;
+    return el;
+  }
+
+  // Khóa nút Gửi trong lúc chờ và đếm ngược thời gian nghỉ
+  function lockInput(ms) {
+    sendButton.disabled = true;
+    userInput.disabled = true;
+    let left = Math.ceil(ms / 1000);
+    sendButton.textContent = left + "s";
+    const timer = setInterval(() => {
+      left--;
+      if (left <= 0) {
+        clearInterval(timer);
+        sendButton.disabled = false;
+        userInput.disabled = false;
+        sendButton.textContent = "Gửi";
+        userInput.focus();
+      } else {
+        sendButton.textContent = left + "s";
+      }
+    }, 1000);
+  }
+
+  // Gọi máy chủ, tự thử lại khi bận
+  async function askServer(text, typingEl) {
+    for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+      let res, data;
+      try {
+        res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        });
+        data = await res.json().catch(() => ({}));
+      } catch (err) {
+        if (!navigator.onLine) return MESSAGES.offline;
+        data = { error: "busy" };
+      }
+
+      if (res && res.ok && data.reply) return data.reply;
+      if (data.error === "bad_key" || data.error === "missing_key") return MESSAGES.maintenance;
+
+      // Bận: chờ rồi thử lại (thêm chút ngẫu nhiên để các máy không hỏi lại cùng lúc)
+      if (attempt < RETRY_DELAYS.length) {
+        const wait = RETRY_DELAYS[attempt] + Math.floor(Math.random() * 2000);
+        typingEl.textContent = MESSAGES.waiting(Math.round(wait / 1000));
+        await sleep(wait);
+        typingEl.textContent = "🤖 NAO đang nghĩ...";
+      }
+    }
+    return MESSAGES.busy;
+  }
+
+  let busy = false;
+
+  // B. Gửi câu hỏi
+  async function sendMessage() {
+    const userText = userInput.value.trim();
+    if (userText === "" || busy) return;
+
+    busy = true;
+    sendButton.disabled = true;
+    displayMessage(userText, "user");
+    userInput.value = "";
+
+    // Câu hỏi quen thuộc: trả lời ngay, không cần gọi Gemini
+    const faq = findFaqAnswer(userText);
+    if (faq) {
+      displayMessage(faq, "bot");
+      busy = false;
+      lockInput(3000);
+      return;
     }
 
-    // Hàm chính xử lý gửi tin nhắn
-    async function sendMessage() {
-        const userText = userInput.value.trim();
-        if (userText === '') return;
+    const typing = displayMessage("🤖 NAO đang nghĩ...", "bot");
+    const reply = await askServer(userText, typing);
+    typing.remove();
+    displayMessage(reply, "bot");
 
-        displayMessage(userText, 'user');
-        userInput.value = '';
-        
-        const typingIndicator = displayMessage("🤖 NAO đang nghĩ...", 'bot');
+    busy = false;
+    lockInput(COOLDOWN_MS);
+  }
 
-        try {
-            // 2. Gọi Gemini API
-            const response = await ai.models.generateContent({
-                model: modelName,
-                contents: [{ role: "user", parts: [{ text: userText }] }],
-                config: {
-                    systemInstruction: systemInstruction,
-                }
-            });
-
-            // 3. Xóa tin nhắn "đang gõ" và hiển thị kết quả
-            contentArea.removeChild(typingIndicator);
-            const botResponse = response.text.trim();
-            displayMessage(botResponse, 'bot');
-
-        } catch (error) {
-            console.error("Lỗi khi gọi Gemini API:", error);
-            contentArea.removeChild(typingIndicator);
-            displayMessage("🤖 NAO: Xin lỗi, tớ đang gặp sự cố kết nối. Bạn thử hỏi lại nhé! (Kiểm tra lại Khóa API)", 'bot');
-        }
+  sendButton.addEventListener("click", sendMessage);
+  userInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      sendMessage();
     }
-
-    // Gắn sự kiện gửi tin nhắn (click và nhấn Enter)
-    sendButton.addEventListener('click', sendMessage);
-    userInput.addEventListener('keydown', function(event) {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            sendMessage();
-        }
-    });
+  });
 });
