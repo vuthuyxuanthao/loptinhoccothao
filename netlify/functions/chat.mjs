@@ -8,7 +8,7 @@ Nếu câu hỏi không liên quan đến Công dân số, an toàn mạng, hay 
 
 // Model nhẹ trước (hạn mức cao hơn, trả lời nhanh), hết lượt thì thử model còn lại.
 // Mỗi model có hạn mức riêng nên dùng 2 model giúp phục vụ được nhiều lượt hơn.
-const MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
+const MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
 
 async function callGemini(model, text, apiKey) {
   const res = await fetch(
@@ -20,8 +20,7 @@ async function callGemini(model, text, apiKey) {
         systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
         contents: [{ role: "user", parts: [{ text }] }],
         generationConfig: {
-          maxOutputTokens: 300,
-          thinkingConfig: { thinkingBudget: 0 }, // tắt "suy nghĩ" để trả lời nhanh hơn
+          maxOutputTokens: 1024,
         },
       }),
     }
@@ -69,7 +68,8 @@ export default async (req) => {
       lastDetail = data?.error?.message || "";
       // Ghi lỗi vào nhật ký Netlify (Logs > Functions > chat) để dễ tìm nguyên nhân
       console.error(`Gemini ${model} lỗi ${status}: ${lastDetail}`);
-      if (status === 400 || status === 401 || status === 403) break; // sai khóa: không thử tiếp
+      if (status === 401 || status === 403) break; // sai khóa: không thử tiếp
+      // 404 (model ngừng cung cấp) hoặc 429/5xx: thử model kế tiếp
     } catch (e) {
       lastStatus = 0;
       lastDetail = String(e);
