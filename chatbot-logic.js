@@ -2,37 +2,124 @@
 // Câu hỏi được gửi tới /api/chat (hàm Netlify), hàm đó mới gọi Gemini.
 
 // ===== 1. CÂU TRẢ LỜI CÓ SẴN (không tốn lượt gọi Gemini) =====
-// Câu hỏi nào chứa một trong các từ khóa sẽ được trả lời ngay.
+// Mỗi mục có "need": danh sách NHÓM từ khóa. Câu hỏi phải chứa ít nhất 1 từ
+// trong MỖI nhóm thì mới khớp. Mục khớp nhiều nhóm nhất (cụ thể nhất) sẽ được chọn.
+// Từ khóa viết KHÔNG DẤU, chữ thường (học sinh gõ có dấu hay không dấu đều nhận).
 // Thầy cô có thể thêm/sửa các mục bên dưới cho hợp bài học.
 const FAQ = [
+  // --- Mật khẩu ---
   {
-    keys: ["mật khẩu", "mat khau", "password"],
-    answer: "🤖 NAO: Mật khẩu giống như chìa khóa nhà vậy! Bạn chỉ cho bố mẹ biết thôi, không đưa cho bạn bè hay người lạ. Mật khẩu tốt nên dài, có cả chữ và số nhé!",
+    need: [["mat khau", "password", "pass"], ["nguoi la", "nguoi khong quen", "nguoi tren mang", "ai do", "nguoi khac"], ["cho", "dua", "gui", "noi", "chia se", "tiet lo", "xin"]],
+    answer: "🤖 NAO: KHÔNG bao giờ nhé! Mật khẩu là bí mật của riêng bạn, giống như chìa khóa nhà. Người lạ xin mật khẩu thường là để lấy trộm tài khoản. Bạn hãy từ chối, không trả lời và kể ngay cho bố mẹ hoặc thầy cô biết.",
   },
   {
-    keys: ["thông tin cá nhân", "thong tin ca nhan", "địa chỉ nhà", "số điện thoại"],
-    answer: "🤖 NAO: Tên trường, địa chỉ nhà, số điện thoại là thông tin cá nhân. Bạn đừng chia sẻ lên mạng hay gửi cho người lạ. Nếu có ai hỏi, hãy báo ngay cho bố mẹ hoặc thầy cô nha!",
+    need: [["mat khau", "password", "pass"], ["ban than", "ban be", "ban cung lop", "ban minh", "cho ban"]],
+    answer: "🤖 NAO: Không nên đâu! Kể cả bạn thân cũng không nên biết mật khẩu của bạn. Bạn bè có thể vô tình nói cho người khác, hoặc lỡ đăng nhập làm mất bài của bạn. Chỉ bố mẹ (người giám hộ) mới nên biết mật khẩu thôi nhé!",
   },
   {
-    keys: ["người lạ", "nguoi la", "kết bạn"],
-    answer: "🤖 NAO: Trên mạng có thể có người lạ giả làm bạn. Bạn không nhận lời kết bạn, không nói chuyện riêng và không hẹn gặp người lạ. Hãy kể với người lớn mà bạn tin tưởng nhé!",
+    need: [["mat khau", "password"], ["tao", "dat", "manh", "nhu the nao", "the nao", "cach", "an toan"]],
+    answer: "🤖 NAO: Mật khẩu mạnh nên dài ít nhất 8 ký tự, có chữ hoa, chữ thường, số và ký hiệu (ví dụ: Meo@Vang2026). Đừng dùng tên, ngày sinh hay 123456. Mỗi tài khoản nên có mật khẩu khác nhau và nhờ bố mẹ giữ giúp nhé!",
   },
   {
-    keys: ["bắt nạt", "bat nat", "chửi", "trêu"],
-    answer: "🤖 NAO: Nếu ai đó nói lời xấu với bạn trên mạng, bạn đừng trả lời lại. Hãy chụp màn hình và báo cho bố mẹ, thầy cô ngay. Bạn không có lỗi đâu, và luôn có người giúp bạn!",
+    need: [["mat khau", "password"]],
+    answer: "🤖 NAO: Mật khẩu là chìa khóa bảo vệ tài khoản của bạn. Hãy giữ bí mật, không cho bạn bè hay người lạ biết, chỉ bố mẹ được biết thôi. Mật khẩu tốt nên dài và có cả chữ, số, ký hiệu nhé!",
+  },
+  // --- Người lạ ---
+  {
+    need: [["nguoi la", "nguoi quen tren mang", "ban tren mang", "ban qua mang"], ["gap", "hen", "di choi", "ra ngoai"]],
+    answer: "🤖 NAO: TUYỆT ĐỐI KHÔNG hẹn gặp người chỉ quen trên mạng! Người đó có thể không phải là người như họ nói. Nếu ai rủ bạn đi gặp, hãy từ chối và kể ngay với bố mẹ, thầy cô nhé.",
   },
   {
-    keys: ["xin chào", "xin chao", "chào nao", "chào bạn", "hello", "hi nao", "bạn tên gì", "ban ten gi", "bạn là ai"],
-    answer: "🤖 NAO: Chào bạn! Tớ là NAO. Bạn muốn hỏi tớ về mật khẩu, thông tin cá nhân hay cách dùng Internet an toàn nào?",
+    need: [["nguoi la", "nguoi khong quen"], ["ket ban", "nhan tin", "lam quen", "noi chuyen", "chat", "kb"]],
+    answer: "🤖 NAO: Bạn không nên kết bạn hay nhắn tin riêng với người lạ trên mạng nhé. Trên mạng, người lạ có thể giả làm bạn cùng tuổi. Nếu có người lạ nhắn tin, đừng trả lời mà hãy cho bố mẹ hoặc thầy cô xem.",
+  },
+  {
+    need: [["nguoi la", "nguoi khong quen"]],
+    answer: "🤖 NAO: Với người lạ trên mạng, bạn nhớ 3 điều: không kết bạn, không cho thông tin cá nhân, không hẹn gặp. Có gì lạ hãy kể ngay với người lớn mà bạn tin tưởng nhé!",
+  },
+  // --- Thông tin cá nhân ---
+  {
+    need: [["thong tin ca nhan", "dia chi", "so dien thoai", "sdt", "ten truong", "nha minh o dau", "ngay sinh"]],
+    answer: "🤖 NAO: Họ tên đầy đủ, địa chỉ nhà, số điện thoại, tên trường, ngày sinh là thông tin cá nhân. Bạn đừng đăng lên mạng hay gửi cho người lạ. Nếu có ai hỏi, hãy hỏi ý bố mẹ hoặc thầy cô trước nha!",
+  },
+  // --- Ảnh ---
+  {
+    need: [["anh", "hinh", "video", "clip"], ["dang", "chia se", "gui", "up", "dua len"]],
+    answer: "🤖 NAO: Trước khi đăng ảnh lên mạng, bạn hãy xin phép bố mẹ và những người có trong ảnh nhé. Đừng đăng ảnh có đồng phục, bảng tên trường hay số nhà, vì người lạ có thể biết bạn ở đâu.",
+  },
+  // --- Bắt nạt ---
+  {
+    need: [["bat nat", "chui", "treu", "noi xau", "che gieu", "doa", "de doa", "xuc pham"]],
+    answer: "🤖 NAO: Nếu bị ai nói lời xấu trên mạng, bạn đừng trả lời lại. Hãy chụp màn hình, chặn người đó và báo ngay cho bố mẹ, thầy cô. Bạn không có lỗi, và luôn có người lớn sẵn sàng giúp bạn!",
+  },
+  // --- Đường link lạ, lừa đảo ---
+  {
+    need: [["link", "duong dan", "trung thuong", "qua tang", "nhan qua", "mien phi", "tin nhan la", "lua dao"]],
+    answer: "🤖 NAO: Đừng bấm vào đường link lạ hay tin nhắn báo 'trúng thưởng', 'nhận quà miễn phí' nhé! Đó thường là bẫy lừa đảo để lấy tài khoản hoặc cài virus. Hãy hỏi bố mẹ hoặc thầy cô trước khi bấm.",
+  },
+  // --- Tải game, ứng dụng ---
+  {
+    need: [["tai", "cai", "download"], ["game", "tro choi", "ung dung", "app", "phan mem"]],
+    answer: "🤖 NAO: Trước khi tải game hay ứng dụng, bạn hãy hỏi bố mẹ nhé. Chỉ tải từ cửa hàng chính thức (CH Play, App Store), không tải từ link lạ, và đọc kỹ xem ứng dụng có phù hợp với lứa tuổi không.",
+  },
+  // --- Virus ---
+  {
+    need: [["virus", "vi rut", "ma doc", "hacker", "hack"]],
+    answer: "🤖 NAO: Virus máy tính là chương trình xấu có thể làm hỏng máy hoặc lấy trộm thông tin. Để phòng tránh: không bấm link lạ, không tải phần mềm không rõ nguồn gốc, và báo người lớn khi máy chạy bất thường nhé!",
+  },
+  // --- AI ---
+  {
+    need: [["ai", "chatbot", "tri tue nhan tao", "gemini", "chatgpt"], ["lam ho", "lam bai", "bai tap", "giai bai", "lam van", "chep"]],
+    answer: "🤖 NAO: Nhờ AI làm hộ bài tập là chưa đúng đâu! Bạn sẽ không học được gì. Hãy dùng AI như người bạn gợi ý: hỏi để hiểu bài, xin ý tưởng, rồi tự làm bằng sức của mình nhé!",
+  },
+  {
+    need: [["ai", "chatbot", "tri tue nhan tao"], ["sai", "dung khong", "tin", "chinh xac", "luon dung"]],
+    answer: "🤖 NAO: AI rất giỏi nhưng vẫn có thể trả lời SAI đó! Bạn hãy kiểm tra lại bằng sách giáo khoa, hỏi thầy cô hoặc bố mẹ trước khi tin hoàn toàn nhé.",
+  },
+  {
+    need: [["tri tue nhan tao", "ai la gi", "ai la cai gi"]],
+    answer: "🤖 NAO: AI (trí tuệ nhân tạo) là chương trình máy tính có thể học hỏi, trả lời câu hỏi, vẽ tranh… giống như tớ vậy! AI giúp ta học tốt hơn, nhưng cần dùng đúng cách và luôn có người lớn hướng dẫn nhé.",
+  },
+  // --- Thời gian dùng thiết bị ---
+  {
+    need: [["choi game", "dung may tinh", "dung dien thoai", "xem youtube", "thoi gian", "bao lau", "nhieu gio"]],
+    answer: "🤖 NAO: Bạn nên dùng thiết bị điện tử vừa phải, không quá 1–2 giờ mỗi ngày để giải trí. Cứ 20 phút hãy nhìn xa 20 giây cho mắt nghỉ ngơi, và dành thời gian chơi thể thao, đọc sách nữa nhé!",
+  },
+  // --- Tin giả ---
+  {
+    need: [["tin gia", "tin don", "tin that", "tin dung khong", "fake"]],
+    answer: "🤖 NAO: Không phải tin nào trên mạng cũng đúng! Trước khi tin hay chia sẻ, bạn hãy xem tin đó từ đâu, có báo uy tín nào đưa không, và hỏi bố mẹ, thầy cô nhé.",
+  },
+  // --- Công dân số ---
+  {
+    need: [["cong dan so"]],
+    answer: "🤖 NAO: Công dân số là người biết dùng Internet và thiết bị số an toàn, lịch sự và có trách nhiệm: bảo vệ thông tin cá nhân, tôn trọng người khác trên mạng và dùng công nghệ để học tập tốt hơn. Bạn cũng là một công dân số đó!",
+  },
+  // --- Chào hỏi (giữ mục này ở CUỐI) ---
+  {
+    need: [["xin chao", "chao nao", "chao ban", "hello", "hi nao", "ban ten gi", "ban la ai", "ten ban"]],
+    answer: "🤖 NAO: Chào bạn! Tớ là NAO, robot giúp bạn học Kỹ năng Công dân số. Bạn muốn hỏi tớ về mật khẩu, người lạ trên mạng hay cách dùng AI đúng cách nào?",
   },
 ];
 
+// Bỏ dấu tiếng Việt để so khớp
+function normalize(s) {
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/\s+/g, " ").trim();
+}
+
 function findFaqAnswer(text) {
-  const t = text.toLowerCase().trim().replace(/[!.?]+$/, "");
+  const t = " " + normalize(text).replace(/[!.?,]+/g, " ").replace(/\s+/g, " ").trim() + " ";
   // Lời chào ngắn: trả lời ngay
-  if (["hi", "chào", "chao", "alo", "hello", "xin chào"].includes(t)) return FAQ[FAQ.length - 1].answer;
-  const hit = FAQ.find((item) => item.keys.some((k) => t.includes(k)));
-  return hit ? hit.answer : null;
+  if ([" hi ", " chao ", " alo ", " hello ", " xin chao "].includes(t)) return FAQ[FAQ.length - 1].answer;
+  // so khớp theo cả từ (tránh "ai" khớp nhầm với "tai", "sai"...)
+  const has = (k) => t.includes(" " + k + " ") || (k.includes(" ") && t.includes(k));
+  let best = null;
+  for (const item of FAQ) {
+    if (item.need.every((group) => group.some(has))) {
+      if (!best || item.need.length > best.need.length) best = item;
+    }
+  }
+  return best ? best.answer : null;
 }
 
 // ===== 2. CÀI ĐẶT CHỜ & THỬ LẠI =====
