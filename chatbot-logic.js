@@ -15,7 +15,7 @@ const FAQ = [
   },
   {
     keys: ["người lạ", "nguoi la", "kết bạn"],
-    answer: "🤖 NAO: Trên mạng có thể có người lạ giả làm bạn. Bạn không nhận lời kết bạn, không nhận đồ, không nói chuyện riêng và không hẹn gặp người lạ. Hãy kể với người lớn mà bạn tin tưởng nhé!",
+    answer: "🤖 NAO: Trên mạng có thể có người lạ giả làm bạn. Bạn không nhận lời kết bạn, không nói chuyện riêng và không hẹn gặp người lạ. Hãy kể với người lớn mà bạn tin tưởng nhé!",
   },
   {
     keys: ["bắt nạt", "bat nat", "chửi", "trêu"],
@@ -25,7 +25,6 @@ const FAQ = [
     keys: ["xin chào", "xin chao", "chào nao", "hello", "hi nao"],
     answer: "🤖 NAO: Chào bạn! Tớ là NAO. Bạn muốn hỏi tớ về mật khẩu, thông tin cá nhân hay cách dùng Internet an toàn nào?",
   },
- 
 ];
 
 function findFaqAnswer(text) {
@@ -35,7 +34,7 @@ function findFaqAnswer(text) {
 }
 
 // ===== 2. CÀI ĐẶT CHỜ & THỬ LẠI =====
-const RETRY_DELAYS = [4000, 8000, 15000]; // nếu bận: chờ 4s, 8s, 15s rồi hỏi lại
+const RETRY_DELAYS = [4000, 8000]; // nếu bận: chờ 4s rồi 8s và hỏi lại
 const COOLDOWN_MS = 8000; // mỗi bạn phải chờ 8 giây giữa 2 câu hỏi
 
 const MESSAGES = {
@@ -97,12 +96,20 @@ document.addEventListener("DOMContentLoaded", function () {
     for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
       let res, data;
       try {
-        res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text }),
-        });
-        data = await res.json().catch(() => ({}));
+        // Không chờ quá 20 giây cho mỗi lần hỏi
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 20000);
+        try {
+          res = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: text }),
+            signal: ctrl.signal,
+          });
+          data = await res.json().catch(() => ({}));
+        } finally {
+          clearTimeout(timer);
+        }
       } catch (err) {
         if (!navigator.onLine) return MESSAGES.offline;
         data = { error: "busy" };
