@@ -12,7 +12,7 @@ const MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
 const TOTAL_BUDGET_MS = 9000;
 
 async function callGemini(model, text, apiKey, useThinkingLevel, timeoutMs) {
-  const generationConfig = { maxOutputTokens: 1024 };
+  const generationConfig = { maxOutputTokens: 400 };
   // Giảm "suy nghĩ" của model để trả lời nhanh (nếu model không hỗ trợ thì bỏ)
   if (useThinkingLevel) generationConfig.thinkingConfig = { thinkingLevel: "minimal" };
 
@@ -40,6 +40,10 @@ async function callGemini(model, text, apiKey, useThinkingLevel, timeoutMs) {
 }
 
 export default async (req) => {
+  // "Đánh thức" hàm khi trang vừa mở, để câu hỏi đầu tiên không phải chờ lâu
+  if (req.method === "GET") {
+    return Response.json({ ok: true });
+  }
   if (req.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
@@ -76,6 +80,8 @@ export default async (req) => {
             .trim();
           return Response.json({
             reply: reply || "🤖 NAO: Tớ chưa nghĩ ra câu trả lời, bạn hỏi cách khác nhé!",
+            model,
+            ms: Date.now() - start, // thời gian Gemini trả lời (để theo dõi)
           });
         }
         lastStatus = status;

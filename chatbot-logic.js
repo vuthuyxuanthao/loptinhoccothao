@@ -22,13 +22,15 @@ const FAQ = [
     answer: "🤖 NAO: Nếu ai đó nói lời xấu với bạn trên mạng, bạn đừng trả lời lại. Hãy chụp màn hình và báo cho bố mẹ, thầy cô ngay. Bạn không có lỗi đâu, và luôn có người giúp bạn!",
   },
   {
-    keys: ["xin chào", "xin chao", "chào nao", "hello", "hi nao"],
+    keys: ["xin chào", "xin chao", "chào nao", "chào bạn", "hello", "hi nao", "bạn tên gì", "ban ten gi", "bạn là ai"],
     answer: "🤖 NAO: Chào bạn! Tớ là NAO. Bạn muốn hỏi tớ về mật khẩu, thông tin cá nhân hay cách dùng Internet an toàn nào?",
   },
 ];
 
 function findFaqAnswer(text) {
-  const t = text.toLowerCase();
+  const t = text.toLowerCase().trim().replace(/[!.?]+$/, "");
+  // Lời chào ngắn: trả lời ngay
+  if (["hi", "chào", "chao", "alo", "hello", "xin chào"].includes(t)) return FAQ[FAQ.length - 1].answer;
   const hit = FAQ.find((item) => item.keys.some((k) => t.includes(k)));
   return hit ? hit.answer : null;
 }
@@ -52,6 +54,9 @@ document.addEventListener("DOMContentLoaded", function () {
   const contentArea = document.getElementById("chatbotContent");
   const userInput = document.getElementById("userInput");
   const sendButton = document.getElementById("sendButton");
+
+  // Đánh thức máy chủ ngay khi mở trang (không tốn lượt Gemini)
+  fetch("/api/chat").catch(() => {});
 
   // A. Đóng/mở khung
   toggleButton.addEventListener("click", function () {
@@ -115,7 +120,10 @@ document.addEventListener("DOMContentLoaded", function () {
         data = { error: "busy" };
       }
 
-      if (res && res.ok && data.reply) return data.reply;
+      if (res && res.ok && data.reply) {
+        if (data.ms) console.log("NAO trả lời bằng", data.model, "trong", data.ms, "ms");
+        return data.reply;
+      }
       if (data.detail) console.warn("Chi tiết lỗi:", data.detail);
       if (res && res.status === 404) {
         console.warn("Không tìm thấy /api/chat — kiểm tra thư mục netlify/functions");
@@ -158,7 +166,16 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const typing = displayMessage("🤖 NAO đang nghĩ...", "bot");
+    // Hiện số giây đang chờ để học sinh biết NAO vẫn đang làm việc
+    let sec = 0;
+    const tick = setInterval(() => {
+      sec++;
+      if (typing.textContent.startsWith("🤖 NAO đang nghĩ")) {
+        typing.textContent = "🤖 NAO đang nghĩ" + ".".repeat((sec % 3) + 1) + " (" + sec + " giây)";
+      }
+    }, 1000);
     const reply = await askServer(userText, typing);
+    clearInterval(tick);
     typing.remove();
     displayMessage(reply, "bot");
 
